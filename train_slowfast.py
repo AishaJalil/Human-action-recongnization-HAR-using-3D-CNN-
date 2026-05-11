@@ -126,14 +126,25 @@ class SlowFastDataset(Dataset):
 
         print(f"[{subset}] {len(self.samples)} videos loaded")
 
-    def _load_frames(self, vid_dir, n_frames):
+    def _load_frames(self, vid_dir, n_frames, is_fast=False):
         files = sorted([f for f in os.listdir(vid_dir) if f.endswith('.jpg')])
         total = len(files)
         if total == 0:
             return torch.zeros(3, n_frames, args.img_size, args.img_size)
 
-        indices = np.linspace(0, total-1, n_frames, dtype=int)
-        frames  = []
+        if not is_fast:
+            # Slow Path: Uniformly sampled across the whole video
+            indices = np.linspace(0, total-1, n_frames, dtype=int)
+        else:
+            # Fast Path: Densely sampled (consecutive or high-stride)
+            # This ensures the model actually sees "motion"
+            if total > n_frames:
+                start = np.random.randint(0, total - n_frames)
+                indices = np.arange(start, start + n_frames)
+            else:
+                indices = np.linspace(0, total-1, n_frames, dtype=int)
+        
+        frames = []
         for i in indices:
             try:
                 img = Image.open(os.path.join(vid_dir, files[i])).convert('RGB')
@@ -141,14 +152,14 @@ class SlowFastDataset(Dataset):
                 img = Image.new('RGB', (args.img_size, args.img_size))
             frames.append(self.transform(img))
 
-        return torch.stack(frames, 0).permute(1, 0, 2, 3)  # [3, T, H, W]
+        return torch.stack(frames, 0).permute(1, 0, 2, 3)
 
     def __len__(self):  return len(self.samples)
 
     def __getitem__(self, idx):
         vid_dir, label = self.samples[idx]
-        slow = self._load_frames(vid_dir, self.slow_frames)
-        fast = self._load_frames(vid_dir, self.fast_frames)
+        slow = self._load_frames(vid_dir, self.slow_frames, is_fast=False)
+        fast = self._load_frames(vid_dir, self.fast_frames, is_fast=True)
         return [slow, fast], label
 
 
