@@ -24,7 +24,7 @@ Usage (Kaggle cell):
 import sys
 sys.argv = sys.argv[:1]  # Fix Kaggle/Colab argparse conflict
 
-import os, json, time, traceback
+import argparse
 import numpy as np
 from PIL import Image
 from pathlib import Path
@@ -46,32 +46,58 @@ except:
     HAS_SK = False
     print("[WARN] pip install scikit-learn")
 
-# ── Config — change these ─────────────────────────────────────────────────────
-jpg_root        = '/kaggle/working/TEST_DATA_jpg_raw'
-checkpoint      = '/kaggle/working/results_slowfast/best_model.pth'
-result_path     = '/kaggle/working/test_results_slowfast'
-slow_frames     = 8
-fast_frames     = 32
-img_size        = 224
-batch_size      = 4
-n_workers       = 2
-noclass_thresh  = 0.5   # if max confidence < this → predict "noclass"
+# ── ARGUMENT PARSING (Replaces the old Config section) ────────────────────────
+def get_args():
+    parser = argparse.ArgumentParser(description="Test SlowFast/Two-Stream Model")
+    
+    # Set your defaults here
+    parser.add_argument('--jpg_root', type=str, 
+                        default='/kaggle/working/TEST_DATA_jpg_raw',
+                        help='Path to the directory containing test class folders')
+    parser.add_argument('--checkpoint', type=str, 
+                        default='/kaggle/working/results_slowfast/best_model.pth',
+                        help='Path to the model weights .pth file')
+    parser.add_argument('--result_path', type=str, 
+                        default='/kaggle/working/test_results_slowfast',
+                        help='Directory to save output plots and CSVs')
+    parser.add_argument('--noclass_thresh', type=float, default=0.5,
+                        help='Confidence threshold; below this is labeled "noclass"')
+    parser.add_argument('--batch_size', type=int, default=4)
+    parser.add_argument('--n_workers', type=int, default=2)
+    parser.add_argument('--slow_frames', type=int, default=8)
+    parser.add_argument('--fast_frames', type=int, default=32)
+    parser.add_argument('--img_size', type=int, default=224)
+
+    # parse_known_args prevents errors if Kaggle passes hidden flags like --f or --ip
+    args, _ = parser.parse_known_args()
+    return args
+
+args = get_args()
+
+# Map args to variables used in the rest of your script
+jpg_root        = args.jpg_root
+checkpoint      = args.checkpoint
+result_path     = args.result_path
+slow_frames     = args.slow_frames
+fast_frames     = args.fast_frames
+img_size        = args.img_size
+batch_size      = args.batch_size
+n_workers       = args.n_workers
+noclass_thresh  = args.noclass_thresh
 
 # ── Classes ───────────────────────────────────────────────────────────────────
-# 5 classes — Normal removed, fall added
 CLASSES   = ['fight', 'fall', 'unsafeThrow', 'unsafeClimb', 'unsafeJump']
 C2I       = {c: i for i, c in enumerate(CLASSES)}
 N_CLS     = len(CLASSES)
-
-# noclass is NOT a real class — it's a label added at test time only
-DISPLAY_CLASSES = CLASSES + ['noclass']  # used for CSV only
+DISPLAY_CLASSES = CLASSES + ['noclass']
 
 os.makedirs(result_path, exist_ok=True)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 print(f"\nDevice          : {device}")
 print(f"Checkpoint      : {checkpoint}")
 print(f"JPG root        : {jpg_root}")
-print(f"noclass_thresh  : {noclass_thresh} (confidence below this → noclass)\n")
+print(f"noclass_thresh  : {noclass_thresh}")
 
 # ── Transforms ────────────────────────────────────────────────────────────────
 transform = transforms.Compose([
