@@ -20,11 +20,12 @@ Usage (Kaggle cell):
     sys.argv = sys.argv[:1]
     exec(open('test_slowfast_kaggle.py').read())
 """
-
 import sys
-sys.argv = sys.argv[:1]  # Fix Kaggle/Colab argparse conflict
-
-import argparse
+import os            # <--- This was missing!
+import json
+import time
+import traceback
+import argparse      # Added for command line parameters
 import numpy as np
 from PIL import Image
 from pathlib import Path
@@ -39,51 +40,40 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-try:
-    from sklearn.metrics import confusion_matrix, classification_report
-    HAS_SK = True
-except:
-    HAS_SK = False
-    print("[WARN] pip install scikit-learn")
-
-# ── ARGUMENT PARSING (Replaces the old Config section) ────────────────────────
+# ── ARGUMENT PARSING ──────────────────────────────────────────────────────────
 def get_args():
-    parser = argparse.ArgumentParser(description="Test SlowFast/Two-Stream Model")
+    parser = argparse.ArgumentParser(description="Test SlowFast / Two-Stream model")
     
-    # Set your defaults here
+    # Defaults are set to your Kaggle paths
     parser.add_argument('--jpg_root', type=str, 
-                        default='/kaggle/working/TEST_DATA_jpg_raw',
-                        help='Path to the directory containing test class folders')
+                        default='/kaggle/working/TEST_DATA_jpg_raw')
     parser.add_argument('--checkpoint', type=str, 
-                        default='/kaggle/working/results_slowfast/best_model.pth',
-                        help='Path to the model weights .pth file')
+                        default='/kaggle/working/results_slowfast/best_model.pth')
     parser.add_argument('--result_path', type=str, 
-                        default='/kaggle/working/test_results_slowfast',
-                        help='Directory to save output plots and CSVs')
-    parser.add_argument('--noclass_thresh', type=float, default=0.5,
-                        help='Confidence threshold; below this is labeled "noclass"')
+                        default='/kaggle/working/test_results_slowfast')
+    parser.add_argument('--noclass_thresh', type=float, default=0.5)
     parser.add_argument('--batch_size', type=int, default=4)
     parser.add_argument('--n_workers', type=int, default=2)
     parser.add_argument('--slow_frames', type=int, default=8)
     parser.add_argument('--fast_frames', type=int, default=32)
     parser.add_argument('--img_size', type=int, default=224)
 
-    # parse_known_args prevents errors if Kaggle passes hidden flags like --f or --ip
+    # Use parse_known_args to avoid crashes with Kaggle's hidden internal flags
     args, _ = parser.parse_known_args()
     return args
 
 args = get_args()
 
-# Map args to variables used in the rest of your script
+# Assign variables from args
 jpg_root        = args.jpg_root
 checkpoint      = args.checkpoint
 result_path     = args.result_path
+noclass_thresh  = args.noclass_thresh
+batch_size      = args.batch_size
+n_workers       = args.n_workers
 slow_frames     = args.slow_frames
 fast_frames     = args.fast_frames
 img_size        = args.img_size
-batch_size      = args.batch_size
-n_workers       = args.n_workers
-noclass_thresh  = args.noclass_thresh
 
 # ── Classes ───────────────────────────────────────────────────────────────────
 CLASSES   = ['fight', 'fall', 'unsafeThrow', 'unsafeClimb', 'unsafeJump']
