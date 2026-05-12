@@ -46,13 +46,13 @@ except:
 
 # ── Config ────────────────────────────────────────────────────────────────────
 jpg_root       = '/kaggle/working/TEST_DATA_jpg_raw'
-checkpoint     = '/kaggle/working/results_twostream/best_model.pth'
+checkpoint     = '/kaggle/input/models/aishajalil/two-stream-model/best_model.pth'
 result_path    = '/kaggle/working/test_results_twostream'
 n_frames       = 16
 img_size       = 112
 batch_size     = 8
 n_workers      = 2
-noclass_thresh = 0.5
+noclass_thresh = 0.4
 
 CLASSES  = ['fight', 'fall', 'unsafeThrow', 'unsafeClimb', 'unsafeJump']
 C2I      = {c: i for i, c in enumerate(CLASSES)}
